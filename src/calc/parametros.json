@@ -1,0 +1,83 @@
+{
+  "versao": "2026.2",
+  "vigencia": { "inicio": "2026-01-01", "fim": "2026-12-31" },
+  "verificadoEm": "2026-09-07",
+  "fontes": {
+    "inss": {
+      "nome": "INSS — Tabela de contribuição mensal",
+      "url": "https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal",
+      "normaLegal": "Portaria Interministerial MPS/MF nº 13, de 09/01/2026",
+      "normaUrl": "https://www.gov.br/previdencia/pt-br/assuntos/rpps/documentos/PortariaInterministerialMPSMF13de9dejaneirode2026.pdf"
+    },
+    "irrf": {
+      "nome": "Receita Federal — Tributação de 2026",
+      "url": "https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026",
+      "normaLegal": "Lei nº 15.191/2025 (tabela mensal) e Lei nº 15.270/2025 (redução mensal)",
+      "normaUrl": "https://www.planalto.gov.br/ccivil_03/_Ato2023-2026/2025/Lei/L15191.htm"
+    },
+    "plr": {
+      "nome": "Receita Federal — Tributação de 2026, seção Participação nos Lucros ou Resultados",
+      "url": "https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026",
+      "normaLegal": "Lei nº 10.101/2000 — tributação exclusiva na fonte",
+      "normaUrl": "https://www.planalto.gov.br/ccivil_03/leis/l10101.htm"
+    }
+  },
+  "salarioMinimo": 1621.0,
+  "constantes": {
+    "diasMes": 30,
+    "horasMes": 210,
+    "diasAbonoPecuniario": 10
+  },
+  "inss": {
+    "_metodo": "progressivo por faixa: cada fatia do salario de contribuicao e tributada pela sua propria aliquota",
+    "tetoSalarioContribuicao": 8475.55,
+    "faixas": [
+      { "ate": 1621.0, "aliquota": 0.075 },
+      { "ate": 2902.84, "aliquota": 0.09 },
+      { "ate": 4354.27, "aliquota": 0.12 },
+      { "ate": 8475.55, "aliquota": 0.14 }
+    ]
+  },
+  "irrf": {
+    "_metodo": "base x aliquota - parcela a deduzir, sobre a base apos a maior deducao (legais x simplificado); depois aplica-se a reducao da Lei 15.270/2025",
+    "faixas": [
+      { "ate": 2428.8, "aliquota": 0.0, "deducao": 0.0 },
+      { "ate": 2826.65, "aliquota": 0.075, "deducao": 182.16 },
+      { "ate": 3751.05, "aliquota": 0.15, "deducao": 394.16 },
+      { "ate": 4664.68, "aliquota": 0.225, "deducao": 675.49 },
+      { "ate": null, "aliquota": 0.275, "deducao": 908.73 }
+    ],
+    "deducaoPorDependente": 189.59,
+    "descontoSimplificado": 607.2,
+    "reducao": {
+      "_metodo": "aplicada sobre os RENDIMENTOS TRIBUTAVEIS BRUTOS do pagamento, nao sobre a base de calculo",
+      "limiteIsencaoTotal": 5000.0,
+      "limiteSuperior": 7350.0,
+      "coeficienteA": 978.62,
+      "coeficienteB": 0.133145
+    }
+  },
+  "abonoPecuniario": {
+    "isentoINSS": true,
+    "isentoIRRF": true,
+    "fundamento": "Lei 13.149/2015 (art. 28 §9 Lei 8.212/91) e IN RFB 1.500/2014 art. 11, VI; Sumula 386 STJ"
+  },
+  "ppr": {
+    "_metodo": "bruto = salarioBase * target / 12 * mesesTrabalhados * (resultadoEmpresa / 100) * (1 - reducaoSancao / 100)",
+    "_inputs": "target, mesesTrabalhados, resultadoEmpresa e reducaoSancao sao INPUTS do usuario, nao parametros fiscais. O resultado da empresa muda todo ano e e divulgado poucos dias antes do pagamento, por isso NUNCA deve ser fixado aqui.",
+    "_conferencia": "Folheto do RH: salario 2.000,00 x target 1,5 / 12 x 12 meses x 106,5% - 0% de sancao = 3.195,00 bruto, isento de IR, liquido 3.195,00",
+    "incideINSS": false,
+    "fundamentoINSS": "Lei 10.101/2000 art. 3: a participacao nos lucros nao integra a remuneracao e nao se sujeita a encargos previdenciarios"
+  },
+  "plr": {
+    "_metodo": "tabela ANUAL exclusiva na fonte: bruto x aliquota - deducao. NAO ha desconto simplificado, NAO ha deducao por dependente e NAO se aplica a reducao da Lei 15.270/2025.",
+    "_vigencia": "tabela em vigor a partir de maio de 2025, conforme publicada na pagina de tabelas de 2026 da Receita Federal",
+    "faixas": [
+      { "ate": 8214.4, "aliquota": 0.0, "deducao": 0.0 },
+      { "ate": 9922.28, "aliquota": 0.075, "deducao": 616.08 },
+      { "ate": 13167.0, "aliquota": 0.15, "deducao": 1360.25 },
+      { "ate": 16380.38, "aliquota": 0.225, "deducao": 2347.78 },
+      { "ate": null, "aliquota": 0.275, "deducao": 3166.8 }
+    ]
+  }
+}

@@ -1,0 +1,304 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Fontes hospedadas aqui, nao no Google Fonts. O README promete que o app nao
+ * carrega script de terceiros e que nada sai do navegador; um <link> para
+ * fonts.googleapis.com entregaria IP e user-agent de cada visitante. Os .woff2
+ * em public/fontes vieram de @fontsource-variable/{bodoni-moda,ibm-plex-sans}
+ * (licenca SIL OFL, copia em public/fontes/LICENCA.txt), so os subconjuntos
+ * latinos.
+ */
+@font-face {
+  font-family: 'Bodoni Moda Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/fontes/bodoni-moda-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bodoni Moda Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/fontes/bodoni-moda-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Italico so da Bodoni, e so por causa do "&" do titulo: o e-comercial
+   italico e a forma classica do caractere na tipografia fina. */
+@font-face {
+  font-family: 'Bodoni Moda Variable';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/fontes/bodoni-moda-latin-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('/fontes/ibm-plex-sans-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('/fontes/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@layer base {
+  /*
+   * Tema claro: tinta calcografica sobre papel de seguranca — aquele
+   * verde-palido do talao de cheque, escolhido porque o assunto e dinheiro,
+   * nao porque verde e bonito.
+   */
+  :root {
+    --papel: 228 232 223;
+    --painel: 248 249 245;
+    --recuo: 233 237 228;
+    --campo: 255 255 255;
+
+    --tinta: 14 46 43;
+    --tinta-2: 61 91 86;
+    --tinta-3: 86 110 102;
+
+    --latao: 125 96 21;
+    --latao-linha: 168 128 31;
+    --filete: 198 206 191;
+
+    --ok-fundo: 215 230 220;
+    --ok-texto: 27 81 56;
+    --alerta-fundo: 245 235 213;
+    --alerta-texto: 108 72 12;
+    --alerta-borda: 199 165 96;
+
+    --seta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23566e66'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+
+    /* Tarja do total. No claro e a propria tinta; no escuro precisa ser
+       MAIS clara que o painel, senao some. */
+    --destaque: 14 46 43;
+
+    --sombra: 14 46 43;
+    --grao: 0.05;
+
+    color-scheme: light;
+  }
+
+  /* Tema escuro: a matriz de gravacao — metal escuro, linha em latao. */
+  .dark {
+    --papel: 8 25 27;
+    --painel: 15 37 39;
+    --recuo: 11 30 32;
+    --campo: 13 33 35;
+
+    --tinta: 222 231 225;
+    --tinta-2: 157 179 172;
+    --tinta-3: 127 151 144;
+
+    --latao: 201 162 39;
+    --latao-linha: 168 128 31;
+    --filete: 30 58 59;
+
+    --ok-fundo: 18 51 38;
+    --ok-texto: 156 214 181;
+    --alerta-fundo: 56 43 14;
+    --alerta-texto: 230 199 132;
+    --alerta-borda: 122 96 36;
+
+    --seta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%237f9790'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+
+    --destaque: 29 76 72;
+
+    --sombra: 0 0 0;
+    --grao: 0.07;
+
+    color-scheme: dark;
+  }
+
+  /*
+   * A chapa do cabecalho nao troca com o tema. Ela e a impressao: igual no
+   * claro e no escuro. Manter fixa tambem trava o contraste do titulo.
+   */
+  :root,
+  .dark {
+    --bloco: 14 46 43;
+    /*
+     * A aba inativa e mais escura que a chapa, nao mais clara. Com ela mais
+     * clara, no tema escuro a inativa ficava mais luminosa que a ativa (que
+     * veste a cor do painel) e a hierarquia invertia: dava para confundir qual
+     * aba estava aberta.
+     */
+    --bloco-2: 9 33 31;
+    --bloco-texto: 228 232 223;
+    --bloco-3: 139 165 157;
+    --bloco-latao: 201 162 39;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-papel font-sans text-tinta antialiased;
+    font-synthesis-weight: none;
+  }
+
+  /*
+   * Grao de papel: ruido fractal por cima de tudo, quase invisivel. E o que
+   * tira o app da chapa lisa e coloca numa superficie impressa.
+   */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    opacity: var(--grao);
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
+  }
+
+  /* Foco visivel em tudo que recebe teclado, na cor do latao. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid rgb(var(--latao-linha));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .rotulo {
+    @apply block text-sm font-medium tracking-[0.005em] text-tinta;
+  }
+
+  /*
+   * Sem `outline-none` aqui. O utilitario do Tailwind e
+   * `outline: 2px solid transparent`, e como .campo vive na camada
+   * `components` ele vencia a regra de foco da camada `base` — o campo ficava
+   * com anel de foco INVISIVEL. A borda em latao acompanha o contorno; as
+   * duas juntas deixam o foco inconfundivel.
+   */
+  .campo {
+    @apply w-full rounded-[3px] border border-filete bg-campo px-3 py-2.5 text-base text-tinta
+      transition-[border-color,box-shadow] duration-200
+      hover:border-tinta-3/60
+      focus:border-latao-linha;
+  }
+
+  /*
+   * Campo que ainda falta preencher. A marca e SO a borda: aresta esquerda
+   * grossa mais o contorno em latao, sem tingir o fundo. O fundo bege que
+   * havia aqui sujava a cor do papel e fazia o campo parecer de outro tipo,
+   * nao de outro estado — e deixava a aba de ferias visualmente mais suja que
+   * a de PPR, embora os campos fossem identicos.
+   */
+  .campo-pendente {
+    @apply border-alerta-borda;
+    border-left-width: 3px;
+  }
+
+  /*
+   * Seta do <select>. A cor vem da variavel --seta, redefinida no tema escuro
+   * (ver @layer base): antes era um cinza fixo cravado no componente, que
+   * sumia no fundo escuro. Mascara nao serve aqui — recortaria o select
+   * inteiro no formato da seta, nao so o desenho.
+   */
+  .seta {
+    background-image: var(--seta);
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1.05rem;
+  }
+
+  .dica {
+    @apply mt-1.5 max-w-leitura text-dica text-tinta-3;
+  }
+
+  /*
+   * Filete duplo: a regra de duas linhas da tipografia de documento
+   * financeiro. Marca limite de secao e fechamento de bloco — substitui o
+   * rotulo em CAIXA ALTA que estava aqui, que decorava sem informar nada.
+   *
+   * `border-style: double` com 3px ja rende 1px / vao / 1px. Nao precisa de
+   * pseudo-elemento nem de gradiente.
+   */
+  .filete-duplo {
+    border-top: 3px double rgb(var(--latao-linha) / 0.5);
+  }
+
+  /* Valores monetarios: algarismos tabulares para a coluna fechar no ponto. */
+  .valor {
+    font-variant-numeric: tabular-nums lining-nums;
+    @apply tabular-nums;
+  }
+
+  /*
+   * Selo de estado ("Isento", "Gastar"). Caixa baixa de proposito: a caixa
+   * alta saiu dos titulos de secao por ser maneirismo, e manter aqui seria
+   * incoerente — alem de ler pior em texto miudo.
+   */
+  .selo {
+    @apply inline-flex items-center rounded-[2px] px-2 py-0.5 text-[0.75rem] font-semibold;
+  }
+
+  /*
+   * Entrada do painel ao trocar de aba. Vai no CSS, e nao numa classe aplicada
+   * pelo React, porque sair de display:none reinicia a animacao sozinho — o
+   * efeito acontece sem remontar o componente e sem perder o estado interno
+   * dos acordeoes.
+   */
+  [role='tabpanel']:not([hidden]) {
+    animation: surgir 240ms ease-out both;
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer utilities {
+  /* Bodoni de verdade: peso alto e sem sintese do navegador. */
+  .didone {
+    @apply font-titulo;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+}
+
+/*
+ * Quem pediu menos movimento recebe o app inteiro parado — inclusive a
+ * sequencia de abertura do cabecalho e a contagem do total.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

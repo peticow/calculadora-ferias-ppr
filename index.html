@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0e2e2b" />
+    <meta
+      name="description"
+      content="Calculadora de Férias e PPR — simulação com as tabelas vigentes de INSS, IRRF e PLR. Roda inteiramente no seu navegador."
+    />
+    <meta name="robots" content="noindex" />
+    <title>Calculadora Férias &amp; PPR</title>
+
+    <!--
+      As duas fontes do texto visível na primeira tela. Sem o preload elas só
+      são pedidas depois do CSS, e o título aparece na fonte do sistema antes
+      de saltar para a Bodoni — o salto é grande porque as métricas não batem.
+      Só os subconjuntos latinos; o resto não é baixado (ver @font-face).
+    -->
+    <link
+      rel="preload"
+      href="/fontes/bodoni-moda-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fontes/bodoni-moda-latin-wght-italic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fontes/ibm-plex-sans-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    <script>
+      // Antes da primeira pintura, senão a tela pisca branca no modo escuro.
+      // A chave é a mesma de src/lib/tema.ts, duplicada porque este script
+      // roda fora do bundle.
+      (function () {
+        try {
+          var salvo = localStorage.getItem('ferias-ppr:tema');
+          var escuro =
+            salvo === 'escuro' ||
+            (salvo !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (escuro) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (e) {
+          // Sem localStorage o app abre no tema claro. Nada mais a fazer.
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

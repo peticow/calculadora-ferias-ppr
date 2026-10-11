@@ -1,0 +1,25 @@
+node_modules
+dist
+.env.deploy
+*.local
+.DS_Store
+tsconfig.tsbuildinfo
+
+# ── Dados pessoais ──────────────────────────────────────────────────────────
+# Contracheques, recibos e os testes que conferem o cálculo contra eles: foram
+# a prova real das regras e ficam só nesta máquina. O repositório público
+# traz o código completo, com testes em salário fictício.
+*.privado.*
+privado/
+docs/Contra-Cheques/
+docs/recibos/
+docs/*.pdf
+docs/REGRAS_PAGAMENTO_MENSAL.md
+scripts/previsao-folha.mjs
+Antes e Depois/
+/*.png
+.claude/
+
+# Instruções e skills do Claude Code: ferramenta de trabalho, não do app.
+CLAUDE.md
+skills-lock.json
