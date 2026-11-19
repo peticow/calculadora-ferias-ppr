@@ -152,7 +152,8 @@ function formatar(array $r, array $fotos): array
     if ($out['checklist'] === null) {
         $out['checklist'] = [];
     }
-    $out['total'] = round((float)$out['aluguel'] + (float)$out['condominio'] + (float)$out['iptu'], 2);
+    // Total mensal: a taxa de lixo é anual, entra dividida por 12.
+    $out['total'] = round((float)$out['aluguel'] + (float)$out['condominio'] + (float)$out['iptu'] + (float)$out['taxa_lixo'] / 12, 2);
     $out['fotos'] = $fotos;
     $capaId = $r['capa_foto_id'] !== null ? (int)$r['capa_foto_id'] : null;
     $capa = null;
@@ -387,6 +388,7 @@ function exportar(string $formato): void
             'aluguel' => $i['aluguel'],
             'condominio' => $i['condominio'],
             'iptu' => $i['iptu'],
+            'taxa_lixo_ano' => $i['taxa_lixo'],
             'total_mensal' => $i['total'],
             'quartos' => $i['quartos'], 'suites' => $i['suites'], 'banheiros' => $i['banheiros'],
             'vagas' => $i['vagas'], 'area_m2' => $i['area'],
@@ -414,7 +416,7 @@ function exportar(string $formato): void
         header("Content-Disposition: attachment; filename=\"caderno-visitas-$data.csv\"");
         $out = fopen('php://output', 'w');
         fwrite($out, "\xEF\xBB\xBF"); // BOM: acentos certos no Excel
-        $cab = ['Código', 'Prioridade', 'Status', 'Tipo', 'Bairro', 'Endereço', 'Aluguel', 'Condomínio', 'IPTU',
+        $cab = ['Código', 'Prioridade', 'Status', 'Tipo', 'Bairro', 'Endereço', 'Aluguel', 'Condomínio', 'IPTU', 'Taxa de lixo (ano)',
             'Total mensal', 'Quartos', 'Suítes', 'Banheiros', 'Vagas', 'Área (m²)', 'Andar', 'Elevador', 'Mobiliado'];
         $cab = array_merge($cab, array_values(CV_CHECKLIST), ['Minutos até o terminal', 'Visita em', 'Nota',
             'Motivo do descarte', 'Corretor', 'Imobiliária', 'WhatsApp', 'Link do anúncio', 'Link do Maps',
@@ -423,7 +425,7 @@ function exportar(string $formato): void
         $num = fn($v) => $v === null ? '' : number_format((float)$v, 2, ',', '');
         foreach ($saida as $s) {
             $linha = [$s['codigo'], $s['prioridade'], $s['status'], $s['tipo'], $s['bairro'], $s['endereco'],
-                $num($s['aluguel']), $num($s['condominio']), $num($s['iptu']), $num($s['total_mensal']),
+                $num($s['aluguel']), $num($s['condominio']), $num($s['iptu']), $num($s['taxa_lixo_ano']), $num($s['total_mensal']),
                 $s['quartos'], $s['suites'], $s['banheiros'], $s['vagas'],
                 $s['area_m2'] === null ? '' : $num($s['area_m2']), $s['andar'], $s['elevador'], $s['mobiliado']];
             $linha = array_merge($linha, array_values($s['checklist']), [$s['minutos_ate_terminal'], $s['visita_em'],

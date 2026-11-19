@@ -8,7 +8,8 @@ import {
 } from './util.js';
 
 const CAMPOS_TEXTO = ['link', 'corretor', 'imobiliaria', 'whatsapp', 'endereco', 'bairro', 'maps_link', 'visita_em', 'motivo_descarte', 'anotacoes'];
-const CAMPOS_DINHEIRO = ['aluguel', 'condominio', 'iptu', 'area'];
+const CAMPOS_DINHEIRO = ['aluguel', 'condominio', 'iptu', 'taxa_lixo', 'area'];
+const VALORES = ['aluguel', 'condominio', 'iptu', 'taxa_lixo'];
 const CAMPOS_INTEIROS = ['quartos', 'suites', 'banheiros', 'vagas', 'andar', 'minutos_terminal'];
 const CAMPOS_RADIO = ['tipo', 'elevador', 'mobiliado', 'status'];
 
@@ -88,10 +89,11 @@ export async function abrirFicha(app, id) {
         <div class="campo"><span>Tipo</span>${radios('tipo', TIPOS, 'grade2')}</div>
         ${campo('endereco', 'Endereço', 'autocapitalize="words"')}
         ${campo('bairro', 'Bairro', 'list="dl-bairro" autocapitalize="words"')}
-        <div class="grade3">
-          ${campo('aluguel', 'Aluguel (R$)', 'inputmode="decimal" class="dinheiro"')}
-          ${campo('condominio', 'Condomínio', 'inputmode="decimal" class="dinheiro"')}
+        <div class="grade2c igual">
+          ${campo('aluguel', 'Aluguel/mês (R$)', 'inputmode="decimal" class="dinheiro"')}
+          ${campo('condominio', 'Condomínio/mês', 'inputmode="decimal" class="dinheiro"')}
           ${campo('iptu', 'IPTU/mês', 'inputmode="decimal" class="dinheiro"')}
+          ${campo('taxa_lixo', 'Taxa de lixo/ano', 'inputmode="decimal" class="dinheiro"')}
         </div>
         <p class="alerta-caro" id="alerta-caro" hidden>Aluguel acima de ${reais(LIMITE_ALUGUEL)}</p>
         <div class="total" id="total"></div>
@@ -178,7 +180,7 @@ export async function abrirFicha(app, id) {
   let nota = Number(valores.nota) || 0;
   function preencher(v) {
     CAMPOS_TEXTO.forEach((c) => (el(c).value = v[c] ?? ''));
-    ['aluguel', 'condominio', 'iptu'].forEach((c) => (el(c).value = numBR(v[c])));
+    VALORES.forEach((c) => (el(c).value = numBR(v[c])));
     el('area').value = v.area == null || v.area === '' ? '' : String(v.area).replace('.', ',');
     CAMPOS_INTEIROS.forEach((c) => (el(c).value = v[c] ?? ''));
     CAMPOS_RADIO.forEach((c) => $$(`input[name="${c}"]`, form).forEach((r) => (r.checked = r.value === v[c])));
@@ -217,8 +219,8 @@ export async function abrirFicha(app, id) {
   // ── Campos calculados e condicionais ──
   function atualizarTudo() {
     const d = coletar();
-    const total = (d.aluguel || 0) + (d.condominio || 0) + (d.iptu || 0);
-    $('#total').innerHTML = `Total mensal <b>${reais(total)}</b>`;
+    const total = (d.aluguel || 0) + (d.condominio || 0) + (d.iptu || 0) + (d.taxa_lixo || 0) / 12;
+    $('#total').innerHTML = `<span>Total mensal${d.taxa_lixo ? '<small>inclui lixo ÷ 12</small>' : ''}</span><b>${reais(total)}</b>`;
     const caro = (d.aluguel || 0) > LIMITE_ALUGUEL;
     el('aluguel').classList.toggle('alerta', caro);
     $('#total').classList.toggle('caro', caro);
@@ -263,7 +265,7 @@ export async function abrirFicha(app, id) {
   };
   form.addEventListener('input', mudou);
   form.addEventListener('change', mudou);
-  CAMPOS_DINHEIRO.slice(0, 3).forEach((c) =>
+  VALORES.forEach((c) =>
     el(c).addEventListener('blur', () => {
       const n = lerDinheiro(el(c).value);
       if (n !== null) el(c).value = numBR(n);

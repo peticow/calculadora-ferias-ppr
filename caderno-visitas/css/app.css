@@ -219,6 +219,8 @@ textarea { resize: vertical; }
 .grade3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .grade3 .campo input { padding: 11px 8px; }
 .grade2c { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; align-items: end; }
+.grade2c.igual { grid-template-columns: 1fr 1fr; }
+.total small { display: block; font-size: 0.75rem; opacity: 0.8; }
 .so-apto, .so-descarte { display: none !important; }
 .ficha.eh-apto .so-apto { display: grid !important; }
 .ficha.eh-descarte .so-descarte { display: grid !important; }

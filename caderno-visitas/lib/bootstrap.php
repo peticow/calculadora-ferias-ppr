@@ -17,7 +17,7 @@ const CV_FOTO_MAX_LADO = 2000;
 const CV_CAMPOS = [
     'link' => 'url', 'corretor' => 'text', 'imobiliaria' => 'text', 'whatsapp' => 'text',
     'tipo' => 'enum', 'endereco' => 'text', 'bairro' => 'text',
-    'aluguel' => 'num', 'condominio' => 'num', 'iptu' => 'num',
+    'aluguel' => 'num', 'condominio' => 'num', 'iptu' => 'num', 'taxa_lixo' => 'num',
     'quartos' => 'int', 'suites' => 'int', 'banheiros' => 'int', 'vagas' => 'int',
     'area' => 'num', 'andar' => 'int', 'elevador' => 'enum', 'mobiliado' => 'enum',
     'maps_link' => 'url', 'checklist' => 'json', 'minutos_terminal' => 'int',
@@ -127,6 +127,17 @@ function cv_migrar(PDO $pdo, string $driver): void
         atualizado_em VARCHAR(25) NOT NULL,
         " . implode(",\n        ", $cols) . "
     )$sufixo");
+    // Campos acrescentados depois da criação do banco: adiciona a coluna que faltar.
+    $existentes = [];
+    $sql = $my ? 'SHOW COLUMNS FROM imoveis' : 'PRAGMA table_info(imoveis)';
+    foreach ($pdo->query($sql) as $c) {
+        $existentes[strtolower($c[$my ? 'Field' : 'name'])] = true;
+    }
+    foreach (CV_CAMPOS as $nome => $tipo) {
+        if (!isset($existentes[$nome])) {
+            $pdo->exec("ALTER TABLE imoveis ADD COLUMN $nome {$tipos[$tipo]} NULL");
+        }
+    }
     $pdo->exec("CREATE TABLE IF NOT EXISTS fotos (
         id $pk,
         imovel_id INTEGER NOT NULL,
