@@ -31,13 +31,17 @@ export const CHECKLIST = {
   banheiro_idoso: 'Banheiro adaptável para idoso',
   tomadas_127v: 'Tomadas e voltagem 127V ok',
   ar_condicionado: 'Ar-condicionado ou pontos de ar',
-  sol_manha: 'Sol da manhã',
+  sol: 'Sol',
   rua_silenciosa: 'Rua silenciosa',
   sem_umidade: 'Sem umidade ou infiltração',
   pressao_agua: 'Pressão da água boa',
   sinal_celular: 'Sinal de celular e internet',
   rua_segura: 'Rua segura',
 };
+
+// Opções de cada item do checklist (padrão: Sim / Não / Não vi).
+const SIM_NAO = { sim: 'Sim', nao: 'Não', nao_vi: 'Não vi' };
+export const opcoesCheck = (item) => (item === 'sol' ? { manha: 'Manhã', tarde: 'Tarde', nao_vi: 'Não vi' } : SIM_NAO);
 
 export const LIMITE_ALUGUEL = 4200;
 

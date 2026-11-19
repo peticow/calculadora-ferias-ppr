@@ -20,7 +20,7 @@ const CV_CAMPOS = [
     'aluguel' => 'num', 'condominio' => 'num', 'iptu' => 'num', 'taxa_lixo' => 'num',
     'quartos' => 'int', 'suites' => 'int', 'banheiros' => 'int', 'vagas' => 'int',
     'area' => 'num', 'andar' => 'int', 'elevador' => 'enum', 'mobiliado' => 'enum',
-    'maps_link' => 'url', 'checklist' => 'json', 'minutos_terminal' => 'int',
+    'maps_link' => 'url', 'checklist' => 'json', 'minutos_terminal' => 'int', 'km_terminal' => 'num',
     'status' => 'enum', 'visita_em' => 'text', 'nota' => 'int',
     'motivo_descarte' => 'text', 'anotacoes' => 'longtext',
 ];
@@ -49,7 +49,7 @@ const CV_CHECKLIST = [
     'banheiro_idoso' => 'Banheiro adaptável para idoso',
     'tomadas_127v' => 'Tomadas e voltagem 127V ok',
     'ar_condicionado' => 'Ar-condicionado ou pontos de ar',
-    'sol_manha' => 'Sol da manhã',
+    'sol' => 'Sol',
     'rua_silenciosa' => 'Rua silenciosa',
     'sem_umidade' => 'Sem umidade ou infiltração',
     'pressao_agua' => 'Pressão da água boa',
@@ -57,6 +57,16 @@ const CV_CHECKLIST = [
     'rua_segura' => 'Rua segura',
 ];
 const CV_CHECK_VALORES = ['sim' => 'Sim', 'nao' => 'Não', 'nao_vi' => 'Não vi'];
+// Itens com opções próprias (os demais usam Sim / Não / Não vi).
+const CV_CHECK_OPCOES = ['sol' => ['manha' => 'Manhã', 'tarde' => 'Tarde', 'nao_vi' => 'Não vi']];
+
+function cv_check_opcoes(string $item): array
+{
+    return CV_CHECK_OPCOES[$item] ?? CV_CHECK_VALORES;
+}
+
+// Terminal HGT Aracruz (Imetame Porto, ES-010 km 58, Barra do Riacho).
+const CV_TERMINAL = ['lat' => -19.8570848, 'lng' => -40.0749575];
 
 function cv_config(): array
 {

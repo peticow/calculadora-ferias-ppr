@@ -4,11 +4,11 @@ import { estado, carregarImoveis, substituirImovel, removerImovel } from './esta
 import { comprimir, enfileirar, listarFila, removerDaFila, vincularNovas, enviarPendentes } from './fotos.js';
 import {
   $, $$, esc, reais, numBR, lerDinheiro, ehLink, linkWhats, normalizarLink, normalizarEndereco,
-  debounce, toast, confirmar, TIPOS, STATUS, CHECKLIST, LIMITE_ALUGUEL, grupoTipo,
+  debounce, toast, confirmar, TIPOS, STATUS, CHECKLIST, LIMITE_ALUGUEL, grupoTipo, opcoesCheck,
 } from './util.js';
 
 const CAMPOS_TEXTO = ['link', 'corretor', 'imobiliaria', 'whatsapp', 'endereco', 'bairro', 'maps_link', 'visita_em', 'motivo_descarte', 'anotacoes'];
-const CAMPOS_DINHEIRO = ['aluguel', 'condominio', 'iptu', 'taxa_lixo', 'area'];
+const CAMPOS_DINHEIRO = ['aluguel', 'condominio', 'iptu', 'taxa_lixo', 'area', 'km_terminal'];
 const VALORES = ['aluguel', 'condominio', 'iptu', 'taxa_lixo'];
 const CAMPOS_INTEIROS = ['quartos', 'suites', 'banheiros', 'vagas', 'andar', 'minutos_terminal'];
 const CAMPOS_RADIO = ['tipo', 'elevador', 'mobiliado', 'status'];
@@ -118,6 +118,15 @@ export async function abrirFicha(app, id) {
           <button type="button" class="btn sec" id="minha-loc">📍 Usar minha localização</button>
           <button type="button" class="btn sec" id="abrir-maps">🗺️ Abrir no Maps</button>
         </div>
+        <div class="campo terminal">
+          <span>Distância até o terminal (HGT Aracruz)</span>
+          <div class="grade-terminal">
+            <label class="campo"><span>Minutos de carro</span><input name="minutos_terminal" type="number" inputmode="numeric" min="0"></label>
+            <label class="campo"><span>Km</span><input name="km_terminal" inputmode="decimal"></label>
+            <button type="button" class="btn sec" id="calc-terminal">Calcular</button>
+          </div>
+          <p class="dica" id="status-terminal">Calcula sozinho ao colar o link do Maps.</p>
+        </div>
       </section>
 
       <section class="bloco">
@@ -135,11 +144,10 @@ export async function abrirFicha(app, id) {
         <div class="checklist">
           ${Object.entries(CHECKLIST)
             .map(
-              ([k, r]) => `<div class="item-check"><span>${esc(r)}</span>${radios('ck_' + k, { sim: 'Sim', nao: 'Não', nao_vi: 'Não vi' }, 'tri')}</div>`,
+              ([k, r]) => `<div class="item-check"><span>${esc(r)}</span>${radios('ck_' + k, opcoesCheck(k), k === 'sol' ? 'tri neutro' : 'tri')}</div>`,
             )
             .join('')}
         </div>
-        ${campo('minutos_terminal', 'Minutos até o terminal (Barra do Riacho)', 'type="number" inputmode="numeric" min="0"')}
       </section>
 
       <section class="bloco">
@@ -182,6 +190,7 @@ export async function abrirFicha(app, id) {
     CAMPOS_TEXTO.forEach((c) => (el(c).value = v[c] ?? ''));
     VALORES.forEach((c) => (el(c).value = numBR(v[c])));
     el('area').value = v.area == null || v.area === '' ? '' : String(v.area).replace('.', ',');
+    el('km_terminal').value = v.km_terminal == null || v.km_terminal === '' ? '' : String(v.km_terminal).replace('.', ',');
     CAMPOS_INTEIROS.forEach((c) => (el(c).value = v[c] ?? ''));
     CAMPOS_RADIO.forEach((c) => $$(`input[name="${c}"]`, form).forEach((r) => (r.checked = r.value === v[c])));
     Object.keys(CHECKLIST).forEach((k) =>
@@ -327,6 +336,7 @@ export async function abrirFicha(app, id) {
       (p) => {
         el('maps_link').value = `https://maps.google.com/?q=${p.coords.latitude.toFixed(6)},${p.coords.longitude.toFixed(6)}`;
         mudou();
+        calcularTerminal(true);
         toast(`Localização registrada (precisão ~${Math.round(p.coords.accuracy)} m).`);
         btn.disabled = false;
         btn.textContent = '📍 Usar minha localização';
@@ -339,6 +349,41 @@ export async function abrirFicha(app, id) {
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   };
+
+  // ── Distância até o terminal ──
+  let ultimoLinkCalculado = el('maps_link').value.trim();
+  async function calcularTerminal(automatico = false) {
+    const link = el('maps_link').value.trim();
+    const endereco = [el('endereco').value, el('bairro').value].filter((x) => x.trim()).join(', ');
+    if (automatico && !ehLink(link)) return;
+    if (!link && !endereco) return toast('Cole o link do Maps ou preencha o endereço.', 'erro');
+    const st = $('#status-terminal');
+    const btn = $('#calc-terminal');
+    btn.disabled = true;
+    st.textContent = 'Calculando rota até o terminal…';
+    try {
+      const r = await api('distancia', { metodo: 'POST', corpo: { link, endereco } });
+      ultimoLinkCalculado = link;
+      el('minutos_terminal').value = r.minutos;
+      el('km_terminal').value = String(r.km).replace('.', ',');
+      mudou();
+      st.textContent =
+        r.origem === 'link'
+          ? `✓ ${r.minutos} min · ${String(r.km).replace('.', ',')} km de carro (pelo link do Maps)`
+          : `≈ ${r.minutos} min · ${String(r.km).replace('.', ',')} km — aproximado pelo endereço. Para precisão, use "Usar minha localização" no imóvel.`;
+    } catch (e) {
+      st.textContent = e.status === 0 ? 'Sem conexão — calcule depois.' : e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  $('#calc-terminal').onclick = () => calcularTerminal(false);
+  const autoTerminal = debounce(() => {
+    const l = el('maps_link').value.trim();
+    if (ehLink(l) && l !== ultimoLinkCalculado) calcularTerminal(true);
+  }, 900);
+  el('maps_link').addEventListener('input', autoTerminal);
+  el('maps_link').addEventListener('change', autoTerminal);
 
   // ── Fotos ──
   const urlsLocais = new Map();

@@ -257,6 +257,12 @@ textarea { resize: vertical; }
 .tri label:nth-child(1) input:checked + span { background: #158a4a; border-color: #158a4a; }
 .tri label:nth-child(2) input:checked + span { background: var(--vermelho); border-color: var(--vermelho); }
 .tri label:nth-child(3) input:checked + span { background: #6b7774; border-color: #6b7774; }
+.tri.neutro label:nth-child(1) input:checked + span,
+.tri.neutro label:nth-child(2) input:checked + span { background: #d98e04; border-color: #d98e04; }
+.terminal { padding-top: 4px; border-top: 1px solid #edf1ef; }
+.terminal > span { font-size: 0.95rem !important; color: var(--texto) !important; padding-top: 8px; }
+.grade-terminal { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.grade-terminal .campo input { padding: 11px 8px; }
 
 .nota { display: flex; gap: 4px; }
 .nota button { width: 52px; height: 52px; border: 0; background: none; font-size: 2.1rem; line-height: 1; color: #d3d9d7; cursor: pointer; padding: 0; }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 define('CV_APP', true);
 require __DIR__ . '/lib/bootstrap.php';
+require __DIR__ . '/lib/distancia.php';
 
 set_exception_handler(function (Throwable $e) {
     error_log('[caderno-visitas] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
@@ -96,7 +97,7 @@ function validar(array $in): array
             case 'json':
                 $limpo = [];
                 foreach ((array)$v as $k => $val) {
-                    if (isset(CV_CHECKLIST[$k]) && isset(CV_CHECK_VALORES[$val])) {
+                    if (isset(CV_CHECKLIST[$k]) && is_string($val) && isset(cv_check_opcoes($k)[$val])) {
                         $limpo[$k] = $val;
                     }
                 }
@@ -151,6 +152,13 @@ function formatar(array $r, array $fotos): array
     }
     if ($out['checklist'] === null) {
         $out['checklist'] = [];
+    }
+    // Versão antiga do checklist: "Sol da manhã = Sim" vira "Sol = Manhã".
+    if (isset($out['checklist']['sol_manha'])) {
+        if ($out['checklist']['sol_manha'] === 'sim' && !isset($out['checklist']['sol'])) {
+            $out['checklist']['sol'] = 'manha';
+        }
+        unset($out['checklist']['sol_manha']);
     }
     // Total mensal: a taxa de lixo é anual, entra dividida por 12.
     $out['total'] = round((float)$out['aluguel'] + (float)$out['condominio'] + (float)$out['iptu'] + (float)$out['taxa_lixo'] / 12, 2);
@@ -376,7 +384,7 @@ function exportar(string $formato): void
     foreach ($itens as $pos => $i) {
         $check = [];
         foreach (CV_CHECKLIST as $k => $rot) {
-            $check[$rot] = isset($i['checklist'][$k]) ? CV_CHECK_VALORES[$i['checklist'][$k]] : '';
+            $check[$rot] = isset($i['checklist'][$k]) ? (cv_check_opcoes($k)[$i['checklist'][$k]] ?? '') : '';
         }
         $saida[] = [
             'codigo' => $i['codigo'],
@@ -397,6 +405,7 @@ function exportar(string $formato): void
             'mobiliado' => CV_ENUMS['mobiliado'][$i['mobiliado']] ?? '',
             'checklist' => $check,
             'minutos_ate_terminal' => $i['minutos_terminal'],
+            'km_ate_terminal' => $i['km_terminal'],
             'visita_em' => $i['visita_em'] ? str_replace('T', ' ', $i['visita_em']) : null,
             'nota' => $i['nota'],
             'motivo_descarte' => $i['motivo_descarte'],
@@ -418,7 +427,7 @@ function exportar(string $formato): void
         fwrite($out, "\xEF\xBB\xBF"); // BOM: acentos certos no Excel
         $cab = ['Código', 'Prioridade', 'Status', 'Tipo', 'Bairro', 'Endereço', 'Aluguel', 'Condomínio', 'IPTU', 'Taxa de lixo (ano)',
             'Total mensal', 'Quartos', 'Suítes', 'Banheiros', 'Vagas', 'Área (m²)', 'Andar', 'Elevador', 'Mobiliado'];
-        $cab = array_merge($cab, array_values(CV_CHECKLIST), ['Minutos até o terminal', 'Visita em', 'Nota',
+        $cab = array_merge($cab, array_values(CV_CHECKLIST), ['Minutos até o terminal (HGT Aracruz)', 'Km até o terminal', 'Visita em', 'Nota',
             'Motivo do descarte', 'Corretor', 'Imobiliária', 'WhatsApp', 'Link do anúncio', 'Link do Maps',
             'Anotações', 'Fotos', 'Criado em', 'Atualizado em']);
         fputcsv($out, $cab, ';', '"', '');
@@ -428,7 +437,8 @@ function exportar(string $formato): void
                 $num($s['aluguel']), $num($s['condominio']), $num($s['iptu']), $num($s['taxa_lixo_ano']), $num($s['total_mensal']),
                 $s['quartos'], $s['suites'], $s['banheiros'], $s['vagas'],
                 $s['area_m2'] === null ? '' : $num($s['area_m2']), $s['andar'], $s['elevador'], $s['mobiliado']];
-            $linha = array_merge($linha, array_values($s['checklist']), [$s['minutos_ate_terminal'], $s['visita_em'],
+            $linha = array_merge($linha, array_values($s['checklist']), [$s['minutos_ate_terminal'],
+                $s['km_ate_terminal'] === null ? '' : number_format((float)$s['km_ate_terminal'], 1, ',', ''), $s['visita_em'],
                 $s['nota'], $s['motivo_descarte'], $s['corretor'], $s['imobiliaria'], $s['whatsapp'],
                 $s['link_anuncio'], $s['link_maps'], $s['anotacoes'], implode(' | ', $s['fotos']),
                 $s['criado_em'], $s['atualizado_em']]);
@@ -485,6 +495,14 @@ switch (true) {
         }
         salvar_ordem($ids);
         cv_json(['ok' => true]);
+    case $recurso === 'distancia' && $metodo === 'POST':
+        $c = corpo();
+        try {
+            $local = cv_localizar((string)($c['link'] ?? ''), (string)($c['endereco'] ?? ''));
+            cv_json(cv_rota_terminal($local['lat'], $local['lng']) + $local);
+        } catch (RuntimeException $e) {
+            cv_erro($e->getMessage(), 422);
+        }
     case $recurso === 'exportar' && $metodo === 'GET':
         exportar(($_GET['formato'] ?? 'json') === 'csv' ? 'csv' : 'json');
     default:
