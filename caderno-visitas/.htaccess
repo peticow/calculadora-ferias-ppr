@@ -1,0 +1,35 @@
+# Caderno de Visitas
+Options -Indexes
+DirectoryIndex index.html
+
+AddType application/manifest+json .webmanifest
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Sempre HTTPS (câmera, GPS, microfone e instalação exigem conexão segura)
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  # Pastas internas
+  RewriteRule ^(data|lib)(/|$) - [F,L]
+</IfModule>
+
+# Arquivos sensíveis: configuração, banco, documentação e estado do deploy
+<FilesMatch "^(config\.php|config\.example\.php|README\.md|\.ftp-deploy-sync-state\.json|.*\.(sqlite|sqlite3|db|sql|log|bak))$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+  Header always set X-Frame-Options "DENY"
+  <FilesMatch "^(sw\.js|index\.html|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

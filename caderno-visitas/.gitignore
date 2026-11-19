@@ -1,0 +1,8 @@
+# Nunca versionar: senha, banco e fotos ficam só no servidor.
+config.php
+data/*
+!data/.htaccess
+!data/.gitkeep
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep

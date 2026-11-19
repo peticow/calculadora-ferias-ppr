@@ -1,0 +1,46 @@
+# Publica o Caderno de Visitas na HostGator (imoveis.peticow-ia.com) via FTP.
+# Secrets necessários: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_SERVER_DIR.
+name: Deploy Caderno de Visitas
+
+on:
+  push:
+    branches: [main, claude/caderno-visitas-pwa-trlcsz]
+    paths:
+      - 'caderno-visitas/**'
+      - '.github/workflows/deploy-caderno.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-caderno
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir sintaxe do PHP
+        run: for f in $(find caderno-visitas -name '*.php'); do php -l "$f"; done
+
+      - name: Enviar por FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          local-dir: ./caderno-visitas/
+          # A HostGator aceita FTPS com certificado próprio do servidor.
+          protocol: ftps
+          security: loose
+          # Nunca mexer no que só existe no servidor.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            config.php
+            data/caderno.sqlite*
+            uploads/*.jpg
+            uploads/*.png
+            uploads/*.webp
+            README.md
