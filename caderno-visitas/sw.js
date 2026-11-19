@@ -1,5 +1,5 @@
 // Service worker: abre o app mesmo sem sinal. API nunca vai para o cache.
-const CACHE = 'cv-v1';
+const CACHE = 'cv-v2';
 const SORTABLE = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
 const CASCA = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
@@ -32,6 +32,8 @@ self.addEventListener('fetch', (e) => {
   if (url.origin === location.origin && /\/(api|setup)\.php$/.test(url.pathname)) return;
 
   // Fotos: nomes únicos, nunca mudam → cache primeiro.
+  // Vídeos: direto da rede (são grandes e o player pede trechos).
+  if (/\.(mp4|mov|webm|3gp)$/i.test(url.pathname)) return;
   if (url.origin === location.origin && url.pathname.includes('/uploads/')) {
     e.respondWith(
       caches.match(req).then(

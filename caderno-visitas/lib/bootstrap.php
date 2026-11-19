@@ -12,6 +12,13 @@ const CV_TOKEN_DIAS = 90;
 const CV_COOKIE = 'cv_token';
 const CV_FOTO_MAX_BYTES = 10 * 1024 * 1024;
 const CV_FOTO_MAX_LADO = 2000;
+const CV_VIDEO_PARTE = 2 * 1024 * 1024;      // 2 MB por parte
+const CV_VIDEO_MAX_BYTES = 300 * 1024 * 1024; // 300 MB por vídeo
+
+function cv_tipo_arquivo(string $arquivo): string
+{
+    return preg_match('/\.(mp4|mov|webm|3gp)$/i', $arquivo) ? 'video' : 'foto';
+}
 
 // Campos editáveis do imóvel => tipo.
 const CV_CAMPOS = [

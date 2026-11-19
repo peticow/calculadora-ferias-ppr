@@ -126,7 +126,7 @@ function fotos_de(array $ids): array
     $st->execute($ids);
     $por = [];
     foreach ($st as $f) {
-        $por[(int)$f['imovel_id']][] = ['id' => (int)$f['id'], 'url' => 'uploads/' . $f['arquivo']];
+        $por[(int)$f['imovel_id']][] = ['id' => (int)$f['id'], 'url' => 'uploads/' . $f['arquivo'], 'tipo' => cv_tipo_arquivo($f['arquivo'])];
     }
     return $por;
 }
@@ -165,12 +165,13 @@ function formatar(array $r, array $fotos): array
     $out['fotos'] = $fotos;
     $capaId = $r['capa_foto_id'] !== null ? (int)$r['capa_foto_id'] : null;
     $capa = null;
-    foreach ($fotos as $f) {
+    $soFotos = array_values(array_filter($fotos, fn($f) => $f['tipo'] === 'foto'));
+    foreach ($soFotos as $f) {
         if ($f['id'] === $capaId) {
             $capa = $f;
         }
     }
-    $capa = $capa ?? ($fotos[0] ?? null);
+    $capa = $capa ?? ($soFotos[0] ?? null);
     $out['capa_foto_id'] = $capa['id'] ?? null;
     $out['capa_url'] = $capa['url'] ?? null;
     return $out;
@@ -299,7 +300,7 @@ function receber_foto(int $imovelId): array
         $st = $pdo->prepare('SELECT id, arquivo, imovel_id FROM fotos WHERE client_uid = ?');
         $st->execute([$uid]);
         if ($ja = $st->fetch()) { // reenvio da mesma foto: não duplica
-            return ['id' => (int)$ja['id'], 'url' => 'uploads/' . $ja['arquivo']];
+            return ['id' => (int)$ja['id'], 'url' => 'uploads/' . $ja['arquivo'], 'tipo' => cv_tipo_arquivo($ja['arquivo'])];
         }
     }
     $f = $_FILES['foto'] ?? null;
@@ -356,7 +357,78 @@ function receber_foto(int $imovelId): array
     @chmod("$dir/$arquivo", 0644);
     $pdo->prepare('INSERT INTO fotos (imovel_id, arquivo, client_uid, criado_em) VALUES (?, ?, ?, ?)')
         ->execute([$imovelId, $arquivo, $uid !== '' ? $uid : null, cv_agora()]);
-    return ['id' => (int)$pdo->lastInsertId(), 'url' => "uploads/$arquivo"];
+    return ['id' => (int)$pdo->lastInsertId(), 'url' => "uploads/$arquivo", 'tipo' => 'foto'];
+}
+
+/**
+ * Vídeo chega em partes de até 2 MB (cabe em qualquer limite de envio da hospedagem
+ * e retoma de onde parou se o sinal cair). As partes ficam em data/ (bloqueada na web)
+ * e só vão para uploads/ depois de juntas e conferidas.
+ */
+function receber_parte_video(int $imovelId): array
+{
+    buscar($imovelId);
+    $uid = (string)($_POST['uid'] ?? '');
+    $parte = (int)($_POST['parte'] ?? -1);
+    $total = (int)($_POST['total'] ?? 0);
+    if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/', $uid) || $parte < 0 || $total < 1 || $parte >= $total
+        || $total * CV_VIDEO_PARTE > CV_VIDEO_MAX_BYTES + CV_VIDEO_PARTE) {
+        cv_erro($total * CV_VIDEO_PARTE > CV_VIDEO_MAX_BYTES ? 'Vídeo grande demais (máximo 300 MB).' : 'Parte de vídeo inválida.', 413);
+    }
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, arquivo FROM fotos WHERE client_uid = ?');
+    $st->execute([$uid]);
+    if ($ja = $st->fetch()) { // já foi montado antes: reenvio
+        return ['pronto' => true, 'foto' => ['id' => (int)$ja['id'], 'url' => 'uploads/' . $ja['arquivo'], 'tipo' => 'video']];
+    }
+    $dirTmp = CV_ROOT . '/data/partes';
+    if (!is_dir($dirTmp)) {
+        @mkdir($dirTmp, 0755, true);
+    }
+    foreach (glob("$dirTmp/*.part") ?: [] as $velho) { // limpa envios abandonados
+        if (filemtime($velho) < time() - 3 * 86400) {
+            @unlink($velho);
+        }
+    }
+    $tmp = "$dirTmp/$uid.part";
+    clearstatcache();
+    $tamanho = is_file($tmp) ? filesize($tmp) : 0;
+    $esperada = intdiv($tamanho, CV_VIDEO_PARTE);
+    if ($parte < $esperada) { // parte repetida (resposta anterior se perdeu)
+        return ['pronto' => false, 'proxima' => $esperada];
+    }
+    if ($parte > $esperada || $tamanho % CV_VIDEO_PARTE !== 0) {
+        cv_json(['erro' => 'Fora de ordem.', 'proxima' => $esperada], 409);
+    }
+    $f = $_FILES['arquivo'] ?? null;
+    if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+        cv_erro('Parte do vídeo não recebida.', empty($_FILES) ? 413 : 400);
+    }
+    if ($f['size'] > CV_VIDEO_PARTE || ($parte < $total - 1 && $f['size'] !== CV_VIDEO_PARTE)) {
+        cv_erro('Tamanho de parte inválido.');
+    }
+    $dados = file_get_contents($f['tmp_name']);
+    if (file_put_contents($tmp, $dados, FILE_APPEND | LOCK_EX) === false) {
+        throw new RuntimeException('Não consegui gravar o vídeo no servidor.');
+    }
+    if ($parte < $total - 1) {
+        return ['pronto' => false, 'proxima' => $parte + 1];
+    }
+    // Última parte: confere o tipo real do arquivo montado.
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $exts = ['video/mp4' => 'mp4', 'video/quicktime' => 'mov', 'video/webm' => 'webm', 'video/3gpp' => '3gp', 'video/x-m4v' => 'mp4'];
+    if (!isset($exts[$mime])) {
+        @unlink($tmp);
+        cv_erro('Formato de vídeo não aceito. Envie MP4, MOV ou WebM.', 415);
+    }
+    $arquivo = bin2hex(random_bytes(12)) . '.' . $exts[$mime];
+    if (!rename($tmp, CV_ROOT . "/uploads/$arquivo")) {
+        throw new RuntimeException('Não consegui gravar o vídeo no servidor.');
+    }
+    @chmod(CV_ROOT . "/uploads/$arquivo", 0644);
+    $pdo->prepare('INSERT INTO fotos (imovel_id, arquivo, client_uid, criado_em) VALUES (?, ?, ?, ?)')
+        ->execute([$imovelId, $arquivo, $uid, cv_agora()]);
+    return ['pronto' => true, 'foto' => ['id' => (int)$pdo->lastInsertId(), 'url' => "uploads/$arquivo", 'tipo' => 'video']];
 }
 
 function excluir_foto(int $fotoId): void
@@ -413,7 +485,8 @@ function exportar(string $formato): void
             'link_anuncio' => $i['link'],
             'link_maps' => $i['maps_link'],
             'anotacoes' => $i['anotacoes'],
-            'fotos' => array_map(fn($f) => $base . $f['url'], $i['fotos']),
+            'fotos' => array_values(array_map(fn($f) => $base . $f['url'], array_filter($i['fotos'], fn($f) => $f['tipo'] === 'foto'))),
+            'videos' => array_values(array_map(fn($f) => $base . $f['url'], array_filter($i['fotos'], fn($f) => $f['tipo'] === 'video'))),
             'capa' => $i['capa_url'] ? $base . $i['capa_url'] : null,
             'criado_em' => $i['criado_em'],
             'atualizado_em' => $i['atualizado_em'],
@@ -429,7 +502,7 @@ function exportar(string $formato): void
             'Total mensal', 'Quartos', 'Suítes', 'Banheiros', 'Vagas', 'Área (m²)', 'Andar', 'Elevador', 'Mobiliado'];
         $cab = array_merge($cab, array_values(CV_CHECKLIST), ['Minutos até o terminal (HGT Aracruz)', 'Km até o terminal', 'Visita em', 'Nota',
             'Motivo do descarte', 'Corretor', 'Imobiliária', 'WhatsApp', 'Link do anúncio', 'Link do Maps',
-            'Anotações', 'Fotos', 'Criado em', 'Atualizado em']);
+            'Anotações', 'Fotos', 'Vídeos', 'Criado em', 'Atualizado em']);
         fputcsv($out, $cab, ';', '"', '');
         $num = fn($v) => $v === null ? '' : number_format((float)$v, 2, ',', '');
         foreach ($saida as $s) {
@@ -440,7 +513,7 @@ function exportar(string $formato): void
             $linha = array_merge($linha, array_values($s['checklist']), [$s['minutos_ate_terminal'],
                 $s['km_ate_terminal'] === null ? '' : number_format((float)$s['km_ate_terminal'], 1, ',', ''), $s['visita_em'],
                 $s['nota'], $s['motivo_descarte'], $s['corretor'], $s['imobiliaria'], $s['whatsapp'],
-                $s['link_anuncio'], $s['link_maps'], $s['anotacoes'], implode(' | ', $s['fotos']),
+                $s['link_anuncio'], $s['link_maps'], $s['anotacoes'], implode(' | ', $s['fotos']), implode(' | ', $s['videos']),
                 $s['criado_em'], $s['atualizado_em']]);
             // Evita que o Excel interprete células iniciadas por = + - @ como fórmula.
             $linha = array_map(fn($v) => is_string($v) && preg_match('/^[=+\-@]/', $v) ? "'$v" : $v, $linha);
@@ -476,12 +549,18 @@ switch (true) {
         cv_json(['ok' => true]);
     case $recurso === 'imoveis' && $id !== null && $acao === 'fotos' && $metodo === 'POST':
         cv_json(['foto' => receber_foto($id)], 201);
+    case $recurso === 'imoveis' && $id !== null && $acao === 'video' && $metodo === 'POST':
+        cv_json(receber_parte_video($id));
     case $recurso === 'imoveis' && $id !== null && $acao === 'capa' && $metodo === 'POST':
         $fotoId = (int)(corpo()['foto_id'] ?? 0);
-        $st = db()->prepare('SELECT COUNT(*) FROM fotos WHERE id = ? AND imovel_id = ?');
+        $st = db()->prepare('SELECT arquivo FROM fotos WHERE id = ? AND imovel_id = ?');
         $st->execute([$fotoId, $id]);
-        if (!(int)$st->fetchColumn()) {
+        $arq = $st->fetchColumn();
+        if ($arq === false) {
             cv_erro('Foto não encontrada.', 404);
+        }
+        if (cv_tipo_arquivo((string)$arq) !== 'foto') {
+            cv_erro('Vídeo não pode ser capa.');
         }
         db()->prepare('UPDATE imoveis SET capa_foto_id = ? WHERE id = ?')->execute([$fotoId, $id]);
         cv_json(['imovel' => buscar($id)]);

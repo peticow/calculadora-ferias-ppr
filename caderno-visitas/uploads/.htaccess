@@ -12,14 +12,14 @@ RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .phar
 # Lista branca: só arquivos com nome gerado pelo servidor e extensão de imagem.
 <IfModule mod_authz_core.c>
   Require all denied
-  <FilesMatch "^[a-f0-9]{24}\.(jpg|png|webp)$">
+  <FilesMatch "^[a-f0-9]{24}\.(jpg|png|webp|mp4|mov|webm|3gp)$">
     Require all granted
   </FilesMatch>
 </IfModule>
 <IfModule !mod_authz_core.c>
   Order deny,allow
   Deny from all
-  <FilesMatch "^[a-f0-9]{24}\.(jpg|png|webp)$">
+  <FilesMatch "^[a-f0-9]{24}\.(jpg|png|webp|mp4|mov|webm|3gp)$">
     Allow from all
   </FilesMatch>
 </IfModule>

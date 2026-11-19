@@ -1,9 +1,10 @@
 // Cliente da API PHP.
 
 export class ApiErro extends Error {
-  constructor(msg, status = 0) {
+  constructor(msg, status = 0, dados = null) {
     super(msg);
     this.status = status; // 0 = sem conexão
+    this.dados = dados;
   }
 }
 
@@ -32,6 +33,6 @@ export async function api(rota, { metodo = 'GET', corpo, form } = {}) {
   if (res.status === 401 && rota !== 'login') {
     aoDeslogar();
   }
-  if (!res.ok) throw new ApiErro(dados?.erro || `Erro ${res.status} no servidor.`, res.status);
+  if (!res.ok) throw new ApiErro(dados?.erro || `Erro ${res.status} no servidor.`, res.status, dados);
   return dados;
 }

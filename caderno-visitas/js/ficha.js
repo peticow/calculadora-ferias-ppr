@@ -1,7 +1,7 @@
 // Ficha do imóvel: mesma tela para cadastrar e editar.
 import { api } from './api.js';
 import { estado, carregarImoveis, substituirImovel, removerImovel } from './estado.js';
-import { comprimir, enfileirar, listarFila, removerDaFila, vincularNovas, enviarPendentes } from './fotos.js';
+import { comprimir, enfileirar, listarFila, removerDaFila, vincularNovas, enviarPendentes, progressoVideo, VIDEO_MAX } from './fotos.js';
 import {
   $, $$, esc, reais, numBR, lerDinheiro, ehLink, linkWhats, normalizarLink, normalizarEndereco,
   debounce, toast, confirmar, TIPOS, STATUS, CHECKLIST, LIMITE_ALUGUEL, grupoTipo, opcoesCheck,
@@ -130,11 +130,12 @@ export async function abrirFicha(app, id) {
       </section>
 
       <section class="bloco">
-        <h2>Fotos</h2>
+        <h2>Fotos e vídeos</h2>
         <div class="botoes2">
-          <label class="btn pri"><input type="file" accept="image/*" capture="environment" multiple id="in-camera" hidden>📷 Câmera</label>
-          <label class="btn sec"><input type="file" accept="image/*" multiple id="in-galeria" hidden>🖼️ Galeria</label>
+          <label class="btn pri"><input type="file" accept="image/*" capture="environment" multiple id="in-camera" hidden>📷 Foto</label>
+          <label class="btn pri"><input type="file" accept="video/*" capture="environment" id="in-filmar" hidden>🎥 Filmar</label>
         </div>
+        <label class="btn sec largura"><input type="file" accept="image/*,video/*" multiple id="in-galeria" hidden>🖼️ Escolher da galeria</label>
         <p class="dica" id="status-fotos"></p>
         <div class="galeria" id="galeria"></div>
       </section>
@@ -391,25 +392,37 @@ export async function abrirFicha(app, id) {
 
   async function desenharGaleria() {
     const fila = (await listarFila()).filter((i) => (id ? i.imovel_id === id : !i.imovel_id));
-    const doServidor = (im?.fotos || []).map((f) => ({ tipo: 'servidor', id: f.id, url: f.url, capa: f.id === im.capa_foto_id }));
+    const doServidor = (im?.fotos || []).map((f) => ({
+      tipo: 'servidor', id: f.id, url: f.url, video: f.tipo === 'video', capa: f.id === im.capa_foto_id,
+    }));
     const pendentes = fila.map((i) => {
       if (!urlsLocais.has(i.uid)) urlsLocais.set(i.uid, URL.createObjectURL(i.blob));
-      return { tipo: 'pendente', uid: i.uid, url: urlsLocais.get(i.uid), capa: false };
+      return { tipo: 'pendente', uid: i.uid, url: urlsLocais.get(i.uid), video: i.tipo === 'video', capa: false };
     });
-    if (!doServidor.length && pendentes.length) pendentes[0].capa = true;
+    if (!doServidor.some((f) => !f.video)) {
+      const primeira = pendentes.find((f) => !f.video);
+      if (primeira) primeira.capa = true;
+    }
     itensGaleria = [...doServidor, ...pendentes];
     $('#galeria').innerHTML = itensGaleria
-      .map(
-        (f, i) => `<button type="button" class="miniatura" data-i="${i}" aria-label="Ver foto ${i + 1}">
-          <img src="${esc(f.url)}" alt="" loading="lazy">
+      .map((f, i) => {
+        const pct = progressoVideo.get(f.uid);
+        const midia = f.video
+          ? `<video src="${esc(f.url)}#t=0.1" preload="metadata" muted playsinline></video><span class="play" aria-hidden="true">▶</span>`
+          : `<img src="${esc(f.url)}" alt="" loading="lazy">`;
+        return `<button type="button" class="miniatura" data-i="${i}" aria-label="Ver ${f.video ? 'vídeo' : 'foto'} ${i + 1}">
+          ${midia}
           ${f.capa ? '<span class="selo capa">Capa</span>' : ''}
-          ${f.tipo === 'pendente' ? `<span class="selo pend">${id ? 'pendente' : 'envia ao salvar'}</span>` : ''}
-        </button>`,
-      )
+          ${f.tipo === 'pendente' ? `<span class="selo pend">${!id ? 'envia ao salvar' : pct != null ? `enviando ${pct}%` : 'pendente'}</span>` : ''}
+        </button>`;
+      })
       .join('');
     const nPend = pendentes.length;
+    const nVid = itensGaleria.filter((f) => f.video).length;
+    const nFot = itensGaleria.length - nVid;
+    const partes = [nFot && `${nFot} foto${nFot > 1 ? 's' : ''}`, nVid && `${nVid} vídeo${nVid > 1 ? 's' : ''}`].filter(Boolean);
     $('#status-fotos').textContent = itensGaleria.length
-      ? `${itensGaleria.length} foto${itensGaleria.length > 1 ? 's' : ''}${nPend ? ` · ${nPend} aguardando envio` : ''} · toque para ampliar`
+      ? `${partes.join(' e ')}${nPend ? ` · ${nPend} aguardando envio` : ''} · toque para ampliar`
       : '';
   }
 
@@ -419,16 +432,25 @@ export async function abrirFicha(app, id) {
   });
 
   async function receberArquivos(lista) {
-    const arquivos = [...lista].filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
+    const ehVideo = (f) => f.type.startsWith('video/') || /\.(mp4|mov|webm|3gp|m4v)$/i.test(f.name);
+    const arquivos = [...lista].filter((f) => ehVideo(f) || f.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
     if (!arquivos.length) return;
     const st = $('#status-fotos');
     let feitas = 0;
     for (const f of arquivos) {
-      st.textContent = `Preparando foto ${++feitas} de ${arquivos.length}…`;
+      st.textContent = `Preparando ${++feitas} de ${arquivos.length}…`;
       try {
-        await enfileirar(await comprimir(f), id || null);
+        if (ehVideo(f)) {
+          if (f.size > VIDEO_MAX) {
+            toast(`Vídeo grande demais (${Math.round(f.size / 1048576)} MB). O limite é 300 MB — grave trechos mais curtos.`, 'erro');
+            continue;
+          }
+          await enfileirar(f, id || null, 'video');
+        } else {
+          await enfileirar(await comprimir(f), id || null);
+        }
       } catch {
-        toast('Uma das fotos não pôde ser lida.', 'erro');
+        toast('Um dos arquivos não pôde ser lido.', 'erro');
       }
     }
     if (!id) {
@@ -437,7 +459,7 @@ export async function abrirFicha(app, id) {
     }
     desenharGaleria();
   }
-  ['#in-camera', '#in-galeria'].forEach((s) =>
+  ['#in-camera', '#in-filmar', '#in-galeria'].forEach((s) =>
     $(s).addEventListener('change', (e) => {
       receberArquivos(e.target.files);
       e.target.value = '';
@@ -445,7 +467,8 @@ export async function abrirFicha(app, id) {
   );
 
   function recalcularCapa() {
-    const c = im.fotos.find((f) => f.id === im.capa_foto_id) || im.fotos[0];
+    const fotos = im.fotos.filter((f) => f.tipo !== 'video');
+    const c = fotos.find((f) => f.id === im.capa_foto_id) || fotos[0];
     im.capa_foto_id = c?.id ?? null;
     im.capa_url = c?.url ?? null;
   }
@@ -459,7 +482,7 @@ export async function abrirFicha(app, id) {
     substituirImovel(im);
     desenharGaleria();
   };
-  const aoErro = (e) => toast('Foto recusada pelo servidor: ' + e.detail.msg, 'erro');
+  const aoErro = (e) => toast('Arquivo recusado pelo servidor: ' + e.detail.msg, 'erro');
   const aoFila = () => desenharGaleria();
   window.addEventListener('foto-enviada', aoEnviar);
   window.addEventListener('foto-erro', aoErro);
@@ -477,7 +500,9 @@ export async function abrirFicha(app, id) {
         <span class="visor-cont"></span>
         <span></span>
       </div>
-      <div class="visor-trilho">${itensGaleria.map((f) => `<div class="visor-slide"><img src="${esc(f.url)}" alt=""></div>`).join('')}</div>
+      <div class="visor-trilho">${itensGaleria
+        .map((f) => `<div class="visor-slide">${f.video ? `<video src="${esc(f.url)}" controls playsinline preload="metadata"></video>` : `<img src="${esc(f.url)}" alt="">`}</div>`)
+        .join('')}</div>
       <div class="visor-acoes">
         <button type="button" class="btn claro" data-a="capa">★ Marcar como capa</button>
         <button type="button" class="btn perigo" data-a="excluir">Excluir</button>
@@ -492,8 +517,10 @@ export async function abrirFicha(app, id) {
       if (!f) return;
       $('.visor-cont', v).textContent = `${i + 1} / ${itensGaleria.length}`;
       const bc = $('[data-a="capa"]', v);
-      bc.disabled = f.capa || f.tipo === 'pendente';
-      bc.textContent = f.capa ? '★ É a capa' : f.tipo === 'pendente' ? 'Aguardando envio' : '★ Marcar como capa';
+      bc.disabled = f.capa || f.video || f.tipo === 'pendente';
+      bc.textContent = f.capa ? '★ É a capa' : f.video ? 'Vídeo (não vira capa)' : f.tipo === 'pendente' ? 'Aguardando envio' : '★ Marcar como capa';
+      // Pausa vídeos que saíram da tela.
+      $$('video', v).forEach((vid, k) => k !== i && !vid.paused && vid.pause());
     };
     trilho.addEventListener('scroll', debounce(atualizarVisor, 60));
     requestAnimationFrame(() => {
@@ -530,7 +557,7 @@ export async function abrirFicha(app, id) {
         }
       }
       if (a === 'excluir') {
-        const ok = await confirmar({ titulo: 'Excluir esta foto?', texto: 'Não dá para desfazer.', ok: 'Excluir', perigo: true });
+        const ok = await confirmar({ titulo: `Excluir ${f.video ? 'este vídeo' : 'esta foto'}?`, texto: 'Não dá para desfazer.', ok: 'Excluir', perigo: true });
         if (!ok) return;
         try {
           if (f.tipo === 'servidor') {
@@ -543,7 +570,7 @@ export async function abrirFicha(app, id) {
           }
           fechar();
           desenharGaleria();
-          toast('Foto excluída.');
+          toast(f.video ? 'Vídeo excluído.' : 'Foto excluída.');
         } catch (err) {
           toast(err.status === 0 ? 'Sem conexão — tente de novo.' : err.message, 'erro');
         }

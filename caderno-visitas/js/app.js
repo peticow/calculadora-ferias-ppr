@@ -44,7 +44,7 @@ export async function atualizarPendentes() {
   const n = (await listarFila()).length;
   $$('.pendentes').forEach((el) => {
     el.hidden = n === 0;
-    el.textContent = `⏳ ${n} foto${n > 1 ? 's' : ''} pendente${n > 1 ? 's' : ''}`;
+    el.textContent = `⏳ ${n} ${n > 1 ? 'arquivos pendentes' : 'arquivo pendente'} de envio`;
   });
 }
 window.addEventListener('fila-fotos', atualizarPendentes);

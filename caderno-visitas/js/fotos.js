@@ -1,9 +1,13 @@
-// Fotos: compressão no aparelho e fila offline (IndexedDB) com reenvio automático.
+// Fotos e vídeos: compressão das fotos no aparelho, fila offline (IndexedDB) com reenvio
+// automático. Vídeos sobem em partes de 2 MB e retomam de onde pararam.
 import { api } from './api.js';
 import { uid } from './util.js';
 
 const LADO_MAX = 1600;
 const QUALIDADE = 0.8;
+export const PARTE_VIDEO = 2 * 1024 * 1024;
+export const VIDEO_MAX = 300 * 1024 * 1024;
+export const progressoVideo = new Map(); // uid -> 0..100
 
 /** Redimensiona para o lado maior com 1600 px e gera JPEG 0,8. */
 export async function comprimir(arquivo) {
@@ -62,9 +66,9 @@ export const removerDaFila = (id) => tx('readwrite', (s) => s.delete(id));
 
 const avisar = () => window.dispatchEvent(new CustomEvent('fila-fotos'));
 
-/** Coloca a foto na fila. imovelId null = imóvel novo ainda não salvo. */
-export async function enfileirar(blob, imovelId) {
-  const item = { uid: uid(), imovel_id: imovelId, blob, criado: Date.now() };
+/** Coloca foto ou vídeo na fila. imovelId null = imóvel novo ainda não salvo. */
+export async function enfileirar(blob, imovelId, tipo = 'foto') {
+  const item = { uid: uid(), imovel_id: imovelId, blob, tipo, parte: 0, criado: Date.now() };
   await gravar(item);
   avisar();
   if (imovelId) enviarPendentes();
@@ -80,6 +84,44 @@ export async function vincularNovas(imovelId) {
   return enviarPendentes();
 }
 
+async function enviarFoto(it) {
+  const form = new FormData();
+  form.append('uid', it.uid);
+  form.append('foto', it.blob, 'foto.jpg');
+  return api(`imoveis/${it.imovel_id}/fotos`, { metodo: 'POST', form });
+}
+
+async function enviarVideo(it) {
+  const total = Math.max(1, Math.ceil(it.blob.size / PARTE_VIDEO));
+  let parte = it.parte || 0;
+  while (true) {
+    const form = new FormData();
+    form.append('uid', it.uid);
+    form.append('parte', parte);
+    form.append('total', total);
+    form.append('arquivo', it.blob.slice(parte * PARTE_VIDEO, (parte + 1) * PARTE_VIDEO), 'parte.bin');
+    let r;
+    try {
+      r = await api(`imoveis/${it.imovel_id}/video`, { metodo: 'POST', form });
+    } catch (e) {
+      if (e.status === 409 && Number.isInteger(e.dados?.proxima)) {
+        parte = e.dados.proxima; // servidor diz onde parou
+        continue;
+      }
+      throw e;
+    }
+    if (r.pronto) {
+      progressoVideo.delete(it.uid);
+      return r;
+    }
+    parte = r.proxima;
+    // Guarda o avanço: se o sinal cair, recomeça desta parte.
+    await tx('readwrite', (s) => s.put({ ...it, parte }));
+    progressoVideo.set(it.uid, Math.round((parte / total) * 100));
+    avisar();
+  }
+}
+
 let enviando = null;
 export function enviarPendentes() {
   enviando ??= (async () => {
@@ -93,11 +135,8 @@ export function enviarPendentes() {
           .sort((a, b) => a.criado - b.criado)[0];
         if (!it) break;
         tentadas.add(it.uid);
-        const form = new FormData();
-        form.append('uid', it.uid);
-        form.append('foto', it.blob, 'foto.jpg');
         try {
-          const r = await api(`imoveis/${it.imovel_id}/fotos`, { metodo: 'POST', form });
+          const r = it.tipo === 'video' ? await enviarVideo(it) : await enviarFoto(it);
           await removerDaFila(it.uid);
           window.dispatchEvent(new CustomEvent('foto-enviada', { detail: { imovel_id: it.imovel_id, uid: it.uid, foto: r.foto } }));
         } catch (e) {
