@@ -24,7 +24,7 @@ const radios = (nome, opcoes, classe = '') =>
 const campo = (nome, rotulo, extra = '') =>
   `<label class="campo"><span>${rotulo}</span><input name="${nome}" ${extra}></label>`;
 
-export async function abrirFicha(app, id) {
+export async function abrirFicha(app, id, { veioDaLista = false } = {}) {
   let im = id ? estado.imoveis.find((x) => x.id === id) || null : null;
   if (id) {
     try {
@@ -45,6 +45,10 @@ export async function abrirFicha(app, id) {
   if (!estado.carregado) carregarImoveis().catch(() => {});
 
   const chaveRascunho = 'cv-rascunho-' + (id || 'novo');
+  const camadas = [];
+  let saindo = false;
+  let aposVoltar = null;
+  let fecharVisor = null;
   let rascunho = null;
   try {
     rascunho = JSON.parse(localStorage.getItem(chaveRascunho));
@@ -56,7 +60,7 @@ export async function abrirFicha(app, id) {
 
   app.innerHTML = `
     <header class="topo">
-      <a href="#/" class="icone voltar" aria-label="Voltar para a lista">
+      <a href="#/" class="icone voltar" id="btn-voltar" aria-label="Voltar para a lista">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
       <h1>${im ? esc(im.codigo) : 'Novo imóvel'}</h1>
@@ -262,7 +266,7 @@ export async function abrirFicha(app, id) {
   }
 
   // ── Rascunho automático ──
-  let sujo = false;
+  let sujo = !!rascunho; // rascunho restaurado também conta como alteração não salva
   const salvarRascunho = debounce(() => {
     try {
       localStorage.setItem(chaveRascunho, JSON.stringify({ valores: coletar(), base: im?.atualizado_em || null, ts: Date.now() }));
@@ -527,11 +531,15 @@ export async function abrirFicha(app, id) {
       trilho.scrollLeft = inicio * trilho.clientWidth;
       atualizarVisor();
     });
-    const fechar = () => {
+    // O visor ocupa uma entrada no histórico: o "voltar" do Android fecha só ele.
+    empilhar('visor');
+    fecharVisor = () => {
       v.remove();
       document.body.classList.remove('travado');
       document.removeEventListener('keydown', tecla);
+      fecharVisor = null;
     };
+    const fechar = () => history.back();
     const tecla = (e) => {
       if (e.key === 'Escape') fechar();
       if (e.key === 'ArrowRight') trilho.scrollBy({ left: trilho.clientWidth, behavior: 'smooth' });
@@ -674,7 +682,7 @@ export async function abrirFicha(app, id) {
       if (!id) {
         vincularNovas(r.imovel.id);
         toast(`Salvo como ${r.imovel.codigo} ✓`, 'ok');
-        location.replace('#/imovel/' + r.imovel.id);
+        irParaLista(camadas.length, '#/imovel/' + r.imovel.id);
         return;
       }
       im = r.imovel;
@@ -705,17 +713,83 @@ export async function abrirFicha(app, id) {
       removerImovel(id);
       sujo = false;
       toast(`${im.codigo} excluído.`);
-      location.hash = '#/';
+      irParaLista(camadas.length);
     } catch (e) {
       toast(e.status === 0 ? 'Sem conexão — tente de novo.' : e.message, 'erro');
     }
   });
+
+  // ── Botão "voltar" do Android / navegador ──
+  // Pilha de camadas no histórico: 'ficha' (a própria tela) e 'visor' (foto/vídeo aberto).
+  function empilhar(nome) {
+    history.pushState({ camada: nome }, '');
+    camadas.push(nome);
+  }
+  function trocarRota(destino) {
+    history.replaceState({ veioDaLista }, '', destino);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  }
+  /** Sai da ficha. `acima` = quantas entradas nossas ainda estão no topo do histórico. */
+  function irParaLista(acima, destino = '#/') {
+    saindo = true;
+    if (destino === '#/' && veioDaLista) return history.go(-(acima + 1)); // volta à lista que já existe
+    if (!acima) return trocarRota(destino);
+    aposVoltar = () => trocarRota(destino);
+    history.go(-acima);
+  }
+  async function descartarAlteracoes() {
+    localStorage.removeItem(chaveRascunho);
+    sujo = false;
+    if (!id) for (const it of (await listarFila()).filter((i) => !i.imovel_id)) await removerDaFila(it.uid);
+  }
+  const aoVoltar = async () => {
+    if (saindo) {
+      const f = aposVoltar;
+      aposVoltar = null;
+      f?.();
+      return;
+    }
+    const camada = camadas.pop();
+    if (!camada) return;
+    // Com uma janela de confirmação aberta, o "voltar" só cancela a janela.
+    const modal = $('.modal-fundo');
+    if (modal) {
+      empilhar(camada);
+      modal.querySelector('[data-r="0"]')?.click();
+      return;
+    }
+    if (camada === 'visor') return fecharVisor?.();
+    if (!sujo) return irParaLista(0);
+    empilhar('ficha'); // continua na ficha enquanto pergunta
+    const ok = await confirmar({
+      titulo: 'Sair sem salvar?',
+      texto: 'Há alterações que ainda não foram salvas. Se sair agora, elas serão perdidas.',
+      ok: 'Sair sem salvar',
+      perigo: true,
+    });
+    if (!ok) return;
+    await descartarAlteracoes();
+    irParaLista(camadas.length);
+  };
+  window.addEventListener('popstate', aoVoltar);
+  $('#btn-voltar').addEventListener('click', (e) => {
+    e.preventDefault();
+    history.back(); // mesmo comportamento do botão do Android
+  });
+  if (history.state?.camada) {
+    camadas.push('ficha'); // recarregou a página já na ficha: a entrada de proteção já existe
+    if (history.state.camada === 'visor') camadas.push('visor');
+  } else {
+    history.replaceState({ veioDaLista }, '');
+    empilhar('ficha');
+  }
 
   preencher(valores);
   desenharGaleria();
   if (id) enviarPendentes();
 
   return () => {
+    window.removeEventListener('popstate', aoVoltar);
     salvarRascunhoJa();
     pararDitado();
     window.removeEventListener('pagehide', salvarRascunhoJa);

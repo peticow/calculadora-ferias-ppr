@@ -281,6 +281,7 @@ function abrirMenu() {
 }
 
 // ───────── Roteador ─────────
+let rotaAnterior = null;
 async function rotear() {
   limpar?.();
   limpar = null;
@@ -288,9 +289,12 @@ async function rotear() {
   if (logado === false) return telaLogin();
   const h = location.hash.slice(1) || '/';
   const m = h.match(/^\/imovel\/(\d+)$/);
-  if (h === '/novo') limpar = await abrirFicha(app, null);
-  else if (m) limpar = await abrirFicha(app, Number(m[1]));
+  // A ficha precisa saber se a tela anterior no histórico é a lista (para o "voltar").
+  const veioDaLista = history.state?.veioDaLista ?? rotaAnterior === 'lista';
+  if (h === '/novo') limpar = await abrirFicha(app, null, { veioDaLista });
+  else if (m) limpar = await abrirFicha(app, Number(m[1]), { veioDaLista });
   else limpar = telaLista();
+  rotaAnterior = h === '/novo' || m ? 'ficha' : 'lista';
   atualizarPendentes();
 }
 window.addEventListener('hashchange', rotear);

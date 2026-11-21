@@ -12,6 +12,11 @@ if (!defined('CV_APP')) {
 
 const CV_UA = 'CadernoVisitas/1.0 (uso pessoal)';
 
+// O roteador gratuito (OSRM) usa velocidades mais baixas que as do trânsito real.
+// Calibrado contra o Google Maps em Aracruz → terminal: 30,4 min (OSRM) = 25 min (Google)
+// e 31,0 min = 26 min. Fator médio 0,83.
+const CV_FATOR_TEMPO = 0.83;
+
 /** Só seguimos links do Google: impede o servidor de acessar endereços arbitrários. */
 function cv_host_google(string $url): bool
 {
@@ -81,6 +86,16 @@ function cv_coords_do_link(string $url): ?array
     foreach ($padroes as $p) {
         if (preg_match($p, $u, $m) && cv_coord_valida((float)$m[1], (float)$m[2])) {
             return ['lat' => (float)$m[1], 'lng' => (float)$m[2]];
+        }
+    }
+    // "Local sem nome" (alfinete solto no mapa): 19°49'13.6"S 40°17'09.8"W
+    $t = str_replace(['+', '″', '′', 'º'], [' ', '"', "'", '°'], $u);
+    $g = '(\d{1,3})°\s*(\d{1,2})\'\s*([\d.]+)"?\s*';
+    if (preg_match("~{$g}([NS])[\s,]*{$g}([EWLO])~u", $t, $m)) {
+        $lat = ((int)$m[1] + (int)$m[2] / 60 + (float)$m[3] / 3600) * ($m[4] === 'S' ? -1 : 1);
+        $lng = ((int)$m[5] + (int)$m[6] / 60 + (float)$m[7] / 3600) * (in_array($m[8], ['W', 'O'], true) ? -1 : 1);
+        if (cv_coord_valida($lat, $lng)) {
+            return ['lat' => round($lat, 6), 'lng' => round($lng, 6)];
         }
     }
     return null;
@@ -174,7 +189,7 @@ function cv_rota_terminal(float $lat, float $lng): array
     }
     $rota = $r['routes'][0];
     return [
-        'minutos' => max(1, (int)ceil($rota['duration'] / 60)),
+        'minutos' => max(1, (int)round($rota['duration'] * CV_FATOR_TEMPO / 60)),
         'km' => round($rota['distance'] / 1000, 1),
     ];
 }
